@@ -1,0 +1,97 @@
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-alt: #edf2fa;
+  --text: #162033;
+  --muted: #4e5b73;
+  --accent: #0c6cf2;
+  --ok: #12805c;
+  --error: #af2838;
+  --border: #c7d3ea;
+  --shadow: 0 12px 28px rgba(18, 34, 65, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(circle at 15% 0%, #ecf4ff, #f5f7fb 45%);
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+}
+
+.title {
+  margin: 0 0 0.4rem;
+  font-size: 2rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge.success {
+  background: #daf8ef;
+  color: var(--ok);
+}
+
+.badge.error {
+  background: #ffe3e7;
+  color: var(--error);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 0.9rem;
+  padding: 0.6rem 0.4rem;
+}
+
+code {
+  font-family: Consolas, "Courier New", monospace;
+  background: var(--surface-alt);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+}
