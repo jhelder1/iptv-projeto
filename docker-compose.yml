@@ -25,7 +25,7 @@ services:
     container_name: clientezero-web
     restart: unless-stopped
     env_file:
-      - .env.vps
+      - .env
     expose:
       - "3000"
     depends_on:
@@ -97,7 +97,7 @@ services:
       - clientezero-web
       - evolution-api
     env_file:
-      - .env.vps
+      - .env
     ports:
       - "80:80"
       - "443:443"

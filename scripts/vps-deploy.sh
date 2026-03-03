@@ -2,10 +2,10 @@
 set -eu
 
 # Deploy script para VPS
-# Pré-requisitos: .env.vps e .env.n8n preenchidos
+# Pré-requisitos: .env e .env.n8n preenchidos
 
-if [ ! -f ".env.vps" ]; then
-  echo "ERRO: .env.vps nao encontrado. Copie .env.vps.example e preencha os valores."
+if [ ! -f ".env" ]; then
+  echo "ERRO: .env nao encontrado. Copie .env.vps.example para .env e preencha os valores."
   exit 1
 fi
 
@@ -14,9 +14,9 @@ if [ ! -f ".env.n8n" ]; then
   exit 1
 fi
 
-# Exporta vars do .env.vps para este script (necessario para POSTGRES_PASSWORD no compose)
+# Exporta vars do .env para este script (necessario para POSTGRES_PASSWORD no compose)
 set -a
-. ./.env.vps
+. ./.env
 set +a
 
 echo "==> Atualizando imagens..."
@@ -36,4 +36,4 @@ docker compose ps
 
 echo ""
 echo "Deploy concluido!"
-echo "Validar: ./scripts/vps-smoke-test.sh https://\${DOMAIN}"
+echo "Validar: ./scripts/vps-smoke-test.sh https://${DOMAIN}"
