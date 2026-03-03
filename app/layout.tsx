@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ClienteZero MVP",
-  description: "Automacao Mercado Pago -> Supabase -> WhatsApp",
+  title: "ClienteZero",
+  description: "Automacao de Pagamentos IPTV/ISP",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

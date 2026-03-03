@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getDb } from "@/lib/db";
 
 export type LogPayload = {
   id_user: number;
@@ -10,17 +10,16 @@ export type LogPayload = {
 };
 
 export async function insertAutomationLog(payload: LogPayload): Promise<void> {
-  const supabaseAdmin = getSupabaseAdmin();
-  const { error } = await supabaseAdmin.from("automation_log").insert({
-    id_user: payload.id_user,
-    id_fatura: payload.id_fatura ?? null,
-    mp_payment_id: payload.mp_payment_id ?? null,
-    status: payload.status,
-    erro: payload.erro ?? null,
-    whatsapp_enviado: payload.whatsapp_enviado ?? false,
-  });
-
-  if (error) {
-    throw new Error(`Failed to insert automation_log: ${error.message}`);
-  }
+  const sql = getDb();
+  await sql`
+    INSERT INTO automation_log (id_user, id_fatura, mp_payment_id, status, erro, whatsapp_enviado)
+    VALUES (
+      ${payload.id_user},
+      ${payload.id_fatura ?? null},
+      ${payload.mp_payment_id ?? null},
+      ${payload.status},
+      ${payload.erro ?? null},
+      ${payload.whatsapp_enviado ?? false}
+    )
+  `;
 }

@@ -1,20 +1,17 @@
 {$DOMAIN} {
   encode zstd gzip
 
-  @webhook path /api/mp/webhook
-  handle @webhook {
-    reverse_proxy clientezero-web:3000
-  }
-
-  handle_path /api/* {
-    reverse_proxy clientezero-web:3000
-  }
-
-  handle_path /admin/* {
-    reverse_proxy clientezero-web:3000
-  }
-
   handle {
     reverse_proxy clientezero-web:3000
   }
+}
+
+evolution.{$DOMAIN} {
+  encode zstd gzip
+  reverse_proxy evolution-api:8080
+}
+
+n8n.{$DOMAIN} {
+  encode zstd gzip
+  reverse_proxy n8n:5678
 }

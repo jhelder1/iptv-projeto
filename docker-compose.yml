@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clientezero-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clientezero
+      POSTGRES_USER: clientezero
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/supabase/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clientezero"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - apps
+
   clientezero-web:
     build:
       context: .
@@ -9,6 +28,9 @@ services:
       - .env.vps
     expose:
       - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
@@ -28,6 +50,31 @@ services:
       - n8n_data:/home/node/.n8n
     expose:
       - "5678"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - apps
+
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: evolution-api
+    restart: unless-stopped
+    environment:
+      SERVER_URL: https://evolution.${DOMAIN}
+      DEL_INSTANCE: "false"
+      DATABASE_ENABLED: "false"
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      LANGUAGE: pt-BR
+      LOG_LEVEL: ERROR
+      CONFIG_SESSION_PHONE_CLIENT: ClienteZero
+      CONFIG_SESSION_PHONE_NAME: Chrome
+    volumes:
+      - evolution_data:/evolution/instances
+    expose:
+      - "8080"
     networks:
       - apps
 
@@ -37,6 +84,7 @@ services:
     restart: unless-stopped
     depends_on:
       - clientezero-web
+      - evolution-api
     env_file:
       - .env.vps
     ports:
@@ -54,6 +102,8 @@ networks:
     driver: bridge
 
 volumes:
+  pgdata:
   n8n_data:
+  evolution_data:
   caddy_data:
   caddy_config:

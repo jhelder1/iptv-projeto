@@ -1,48 +1,39 @@
 #!/usr/bin/env sh
 set -eu
 
-# Deploy script for VPS
-# - loads .env.vps
-# - deploys containers
-# - runs DB migrations if DATABASE_URL is present and psql is available
+# Deploy script para VPS
+# Pré-requisitos: .env.vps e .env.n8n preenchidos
 
 if [ ! -f ".env.vps" ]; then
-  echo "Missing .env.vps. Copy .env.vps.example and fill secrets."
+  echo "ERRO: .env.vps nao encontrado. Copie .env.vps.example e preencha os valores."
   exit 1
 fi
 
 if [ ! -f ".env.n8n" ]; then
-  echo "Missing .env.n8n. Copy .env.n8n.example and fill settings."
+  echo "ERRO: .env.n8n nao encontrado. Copie .env.n8n.example e preencha os valores."
   exit 1
 fi
 
-# export env vars from .env.vps for this script
+# Exporta vars do .env.vps para este script (necessario para POSTGRES_PASSWORD no compose)
 set -a
 . ./.env.vps
 set +a
 
-echo "Pulling images..."
+echo "==> Atualizando imagens..."
 docker compose pull
 
-echo "Building clientezero-web..."
+echo "==> Build do clientezero-web..."
 docker compose build --no-cache clientezero-web
 
-echo "Bringing up containers..."
+echo "==> Subindo containers..."
 docker compose up -d
 
-echo "Waiting for containers..."
+echo "==> Aguardando postgres ficar saudavel..."
+docker compose wait postgres 2>/dev/null || true
+
+echo "==> Status dos containers:"
 docker compose ps
 
-# Run migrations if DATABASE_URL is provided
-if [ -n "${DATABASE_URL:-}" ]; then
-  if command -v psql >/dev/null 2>&1; then
-    echo "Running DB migrations..."
-    ./scripts/run-migrations.sh
-  else
-    echo "psql not found on PATH — skipping automatic migrations. Run scripts/run-migrations.sh manually on the server."
-  fi
-else
-  echo "DATABASE_URL not set — skipping migrations. If using Supabase, run sql/supabase/001_init_schema.sql in the SQL Editor."
-fi
-
-echo "Deploy complete. Run ./scripts/vps-smoke-test.sh <url> to validate." 
+echo ""
+echo "Deploy concluido!"
+echo "Validar: ./scripts/vps-smoke-test.sh https://\${DOMAIN}"

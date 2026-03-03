@@ -1,272 +1,255 @@
-# iptv-projeto
+# ClienteZero — Gestão de Pagamentos IPTV/ISP
 
-## MVP Next.js + Supabase (implementado)
-
-### 1) Requisitos
-- Node 20+
-- Projeto Supabase criado
-- Credenciais Mercado Pago e Evolution API
-
-### 2) Configuração
-1. Copie `env.example` para `.env.local`.
-2. Preencha `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MP_ACCESS_TOKEN`, `EVOLUTION_*` e `ADMIN_WHATSAPP`.
-3. Rode o SQL `sql/supabase/001_init_schema.sql` no Supabase SQL Editor.
-
-### 3) Rodar local
-`ash
-npm install
-npm run dev
-`$insert
-
-### 4) Endpoints
-- `GET /api/health`
-- `POST /api/mp/webhook` (header opcional: `x-webhook-secret`)
-- `GET /admin/logs`
-
-### 5) Payload esperado no webhook
-```json
-{
-  "action": "payment.updated",
-  "type": "payment",
-  "data": { "id": "123456789" }
-}
-```
-
-### 6) Fluxo implementado
-1. Recebe webhook do Mercado Pago.
-2. Consulta pagamento em `GET /v1/payments/{id}`.
-3. Valida `status=approved` e lê `external_reference` como `id_user`.
-4. Atualiza uma `fatura` pendente (`situ=0` -> `situ=1`).
-5. Busca `acesso.dados` e `app_user` para montar mensagem.
-6. Sanitiza HTML para texto.
-7. Envia WhatsApp para cliente via Evolution.
-8. Insere log em `automation_log`.
-9. Em erro, envia alerta para `ADMIN_WHATSAPP` e registra log de erro.
-
----
-## PRD original
-
-# âš¡ ClienteZero â€” Product Requirements Document
-**MVP v1.0 | MarÃ§o 2026 | CONFIDENCIAL**
-
-> AutomaÃ§Ã£o de Pagamentos IPTV & ISP via N8N + WhatsApp
-
-| Campo | Valor |
-|---|---|
-| Produto | ClienteZero MVP |
-| VersÃ£o | 1.0 |
-| Stack Alvo | N8N + MySQL + Evolution API + Mercado Pago |
-| Prazo MVP | 3 dias Ãºteis apÃ³s setup |
+Sistema completo de automação: Mercado Pago → PostgreSQL → WhatsApp em < 30s.
+Inclui painel admin, baixa automática de inadimplentes, retry de WhatsApp e chargeback.
 
 ---
 
-## 1. VisÃ£o Geral
+## Stack
 
-### 1.1 Problema
-Operadores de IPTV/ISP gerenciam pagamentos 100% manual. Com 74+ inadimplentes no ISP e ativaÃ§Ãµes IPTV aguardando, o custo operacional Ã© crÃ­tico.
-
-### 1.2 SoluÃ§Ã£o
-AutomaÃ§Ã£o: **Mercado Pago â†’ MySQL IPTV â†’ WhatsApp**. Pagamento aprovado = acesso enviado em < 30s.
-
-### 1.3 MÃ©tricas de Sucesso
-
-| MÃ©trica | Baseline | Meta |
-|---|---|---|
-| Tempo pagamento â†’ ativaÃ§Ã£o | > 24h | < 30s |
-| Horas manuais/semana | ~5h | 0h |
-| Taxa de erro | ~15% | < 1% |
-
----
-
-## 2. Escopo MVP
-
-**âœ… IN SCOPE**
-- Webhook `payment.approved` Mercado Pago
-- `UPDATE fatura SET situ=1` no MySQL IPTV
-- `SELECT` dados de acesso (tabela `acesso`)
-- Envio WhatsApp via Evolution API
-- Log em `automation_log`
-- Alerta admin em caso de erro
-
-**âŒ OUT OF SCOPE**
-- Dashboard web, portal cliente, GestorV3 (ISP), multi-tenant, boletos/PIX
-
----
-
-## 3. Arquitetura
-
-### Fluxo Principal
-```
-MP (payment.approved) â†’ N8N Webhook
-â†’ Validar status
-â†’ GET /v1/payments/{id} (MP API)
-â†’ Extrair id_user do external_reference
-â†’ MySQL: UPDATE fatura SET situ=1 WHERE id_user=X AND situ=0
-â†’ MySQL: SELECT dados, nome, tel FROM acesso JOIN user WHERE id_user=X
-â†’ Code Node: strip HTML â†’ texto limpo
-â†’ Evolution API: POST /message/sendText
-â†’ MySQL: INSERT automation_log
-```
-
-### Stack
 | Componente | Tecnologia |
 |---|---|
-| Orquestrador | N8N self-hosted |
-| Banco | MySQL (MariaDB 10.x) â€” banco `gigante` |
-| Pagamento | Mercado Pago IPN Webhooks |
-| WhatsApp | Evolution API v2 |
-
-### Schema Relevante
-
-**`fatura`**: `id`, `id_user`, **`situ` (0=pendente/1=pago â† alvo)**, `valor`, `forma`, `vencimento`
-
-**`acesso`**: `id`, `id_user`, `dados` (TEXT HTML com credenciais)
-
-**`user`**: `id`, `nome`, **`tel`** (WhatsApp), `email`
+| Backend / Webhook | Next.js 16 (App Router) |
+| Banco de dados | PostgreSQL 16 (Docker) |
+| Automação visual | N8N self-hosted (Docker) |
+| WhatsApp | Evolution API v2 (Docker) |
+| Pagamento | Mercado Pago Webhooks |
+| Proxy / HTTPS | Caddy (automático) |
 
 ---
 
-## 4. User Stories
+## Fluxos implementados
 
-### US-01 â€” AtivaÃ§Ã£o AutomÃ¡tica
-- **Como** cliente que pagou via MP
-- **Quero** receber dados de acesso no WhatsApp imediatamente
-- **CritÃ©rios:** webhook em < 5s Â· fatura atualizada em < 10s Â· WhatsApp em < 30s Â· mensagem com nome + links + user/senha
-
-### US-02 â€” Alerta de Falha
-- **Como** operador
-- **Quero** WhatsApp quando ativaÃ§Ã£o falhar
-- **CritÃ©rios:** erro no N8N â†’ WhatsApp admin com id_user + erro + timestamp
-
-### US-03 â€” Log de Auditoria
-- **Como** operador
-- **Quero** registro de cada execuÃ§Ã£o
-- **CritÃ©rios:** `automation_log` com status, erro, timestamp para cada run
-
----
-
-## 5. Workflow N8N â€” 10 Nodes
-
-| # | Node | Tipo | Config |
-|---|---|---|---|
-| 1 | MP Webhook | Webhook POST | `/mp-payment` com auth token |
-| 2 | Validar Approved | IF | `body.action=='payment' AND status=='approved'` |
-| 3 | Buscar MP | HTTP Request | `GET /v1/payments/{{id}}` + Bearer token |
-| 4 | Extrair id_user | Set Node | `external_reference â†’ id_user` |
-| 5 | UPDATE Fatura | MySQL | `UPDATE fatura SET situ=1 WHERE id_user={{id_user}} AND situ=0` |
-| 6 | SELECT Acesso | MySQL | `SELECT a.dados, u.nome, u.tel FROM acesso a JOIN user u ON a.id_user=u.id WHERE a.id_user={{id_user}}` |
-| 7 | Sanitizar HTML | Code (JS) | Strip tags â†’ texto limpo |
-| 8 | Enviar WhatsApp | HTTP Request | `POST Evolution /message/sendText` |
-| 9 | Log Sucesso | MySQL | `INSERT automation_log` |
-| 10 | Error Handler | Error Trigger | WhatsApp admin + log erro |
-
-### Code Node â€” Sanitizar HTML
-```javascript
-const dadosHtml = $input.first().json.dados;
-const dadosLimpos = dadosHtml
-  .replace(/<br\s*\/?>/gi, '\n')
-  .replace(/<\/p>/gi, '\n')
-  .replace(/<\/tr>/gi, '\n')
-  .replace(/<\/td>/gi, ' | ')
-  .replace(/<[^>]+>/g, '')
-  .replace(/&nbsp;/g, ' ')
-  .replace(/\n{3,}/g, '\n\n')
-  .trim();
-return [{ json: { ...$input.first().json, dados_limpos: dadosLimpos } }];
+### 1. Pagamento aprovado
+```
+MP (payment.approved) → POST /api/mp/webhook
+  → Valida secret + status
+  → UPDATE fatura situ=0→1 + reativa acesso
+  → WhatsApp cliente com credenciais IPTV
+  → [WhatsApp falhou] → job_queue para retry automático
+  → INSERT automation_log
 ```
 
-### Mensagem WhatsApp
+### 2. Chargeback / Estorno
 ```
-ðŸŽ‰ OlÃ¡, {{nome}}! Pagamento confirmado!
+MP (payment.cancelled | refunded | charged_back) → POST /api/mp/webhook
+  → UPDATE fatura situ=1→2 (cancelada)
+  → UPDATE acesso ativo=false (suspenso)
+  → WhatsApp cliente: acesso suspenso
+  → INSERT automation_log
+```
 
-Seus dados de acesso:
-{{dados_limpos}}
+### 3. Retry de WhatsApp (N8N a cada 5min)
+```
+POST /api/cron/process-jobs
+  → Busca job_queue com status=pending
+  → Tenta reenviar WhatsApp
+  → Backoff exponencial: 5min → 15min → 30min → failed
+```
 
-âš ï¸ Guarde essas informaÃ§Ãµes.
-â€” Cine Play TV
+### 4. Geração de faturas mensais (N8N todo dia 00:00)
+```
+POST /api/cron/gerar-faturas
+  → Clientes ativos com plano e vencimento ≤ 3 dias
+  → Cria fatura com valor do plano
+  → WhatsApp aviso de vencimento
+```
+
+### 5. Cobranças de inadimplentes (N8N todo dia 08:00)
+```
+POST /api/cron/cobrar-inadimplentes
+  → 3–6 dias vencido → WhatsApp de aviso
+  → 7+ dias vencido → suspende acesso + WhatsApp de suspensão
 ```
 
 ---
 
-## 6. Infraestrutura
+## Painel Admin
 
-### SQL â€” Criar Tabela de Log
-```sql
-CREATE TABLE automation_log (
-  id               INT AUTO_INCREMENT PRIMARY KEY,
-  id_user          INT NOT NULL,
-  id_fatura        INT,
-  mp_payment_id    VARCHAR(100),
-  status           ENUM('success','error') NOT NULL,
-  erro             TEXT,
-  whatsapp_enviado TINYINT(1) DEFAULT 0,
-  created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
+Acesse `https://seu-dominio.com/admin` e faça login com o `ADMIN_TOKEN`.
 
-### VariÃ¡veis de Ambiente N8N
-```env
-MP_ACCESS_TOKEN=APP_USR-xxx
-IPTV_DB_HOST=localhost
-IPTV_DB_NAME=gigante
-IPTV_DB_USER=usuario
-IPTV_DB_PASS=senha
-EVOLUTION_API_URL=https://evolution.seudominio.com
-EVOLUTION_API_KEY=chave
-EVOLUTION_INSTANCE=instancia
-ADMIN_WHATSAPP=5535999999999
-```
+| Rota | Descrição |
+|---|---|
+| `/admin/dashboard` | Métricas: ativos, inadimplentes, receita do mês, suspensos |
+| `/admin/clientes` | Lista, busca e paginação de clientes |
+| `/admin/clientes/novo` | Criar cliente com plano e dados de acesso IPTV |
+| `/admin/clientes/[id]` | Detalhes, faturas, reenviar WA, suspender/reativar |
+| `/admin/faturas` | Lista com filtros por status |
+| `/admin/logs` | Últimas 50 execuções com botão Reenviar WA |
 
 ---
 
-## 7. Plano 3 Dias
+## Endpoints da API
 
-### Dia 1 â€” Setup
-- [ ] Criar tabela `automation_log` no MySQL
-- [ ] Configurar credenciais MySQL e Evolution API no N8N
-- [ ] Registrar webhook no painel MP
-- [ ] Configurar `external_reference={{id_user}}` nos planos MP
-- [ ] Testar webhook em sandbox
-
-### Dia 2 â€” Workflow
-- [ ] Construir nodes 1â€“7
-- [ ] Testar UPDATE + SELECT no banco real
-- [ ] Implementar node WhatsApp
-- [ ] Implementar Error Handler e log
-
-### Dia 3 â€” Go-Live
-- [ ] Teste E2E com 1 pagamento real
-- [ ] Verificar log, WhatsApp e `fatura.situ`
-- [ ] Ativar produÃ§Ã£o
-- [ ] Monitorar 3 ativaÃ§Ãµes reais
-- [ ] Documentar no Notion
-
----
-
-## 8. Definition of Done
-
-- [ ] Webhook processa `payment.approved` sem erro
-- [ ] `fatura.situ=1` em < 15s do webhook
-- [ ] Dados `acesso` lidos corretamente
-- [ ] HTML sanitizado â€” sem tags no WhatsApp
-- [ ] Cliente recebe WhatsApp em < 30s
-- [ ] Admin recebe alerta em caso de erro
-- [ ] Log gravado em `automation_log`
-- [ ] 3 pagamentos reais consecutivos sem falha
-- [ ] Credenciais em variÃ¡veis N8N (nÃ£o hard-coded)
-- [ ] DocumentaÃ§Ã£o no Notion
-
----
-
-## 9. Riscos
-
-| Risco | Prob. | MitigaÃ§Ã£o |
+| Método | Rota | Descrição |
 |---|---|---|
-| MySQL inacessÃ­vel remotamente | **Alta** | SSH tunnel ou liberar porta 3306 com IP fixo |
-| `external_reference` ausente nos planos | **Alta** | Recriar preferÃªncias MP antes do go-live |
-| Evolution API desconectada | MÃ©dia | Health-check diÃ¡rio automatizado |
-| HTML mal formatado no `acesso.dados` | MÃ©dia | SanitizaÃ§Ã£o robusta + teste com dados reais |
-| Webhook MP com duplicatas | Baixa | Checar `situ` antes de atualizar (idempotÃªncia) |
+| GET | `/api/health` | Health check público |
+| POST | `/api/mp/webhook` | Webhook Mercado Pago |
+| POST | `/api/admin/auth` | Login (retorna cookie) |
+| DELETE | `/api/admin/auth` | Logout |
+| GET/POST | `/api/admin/clientes` | CRUD clientes |
+| GET/PUT/DELETE | `/api/admin/clientes/[id]` | Detalhe / editar / desativar |
+| GET/POST | `/api/admin/faturas` | CRUD faturas |
+| PUT/DELETE | `/api/admin/faturas/[id]` | Pagar / cancelar / excluir |
+| GET/POST | `/api/admin/planos` | CRUD planos |
+| POST | `/api/admin/resend/[id_user]` | Reenviar credenciais via WA |
+| POST | `/api/cron/process-jobs` | Processar retry jobs |
+| POST | `/api/cron/gerar-faturas` | Gerar faturas mensais |
+| POST | `/api/cron/cobrar-inadimplentes` | Cobrar / suspender inadimplentes |
+
+**Cron endpoints** requerem header: `x-cron-secret: <CRON_SECRET>`
 
 ---
-*ClienteZero PRD v1.0 â€” Para agente de programaÃ§Ã£o IA â€” MarÃ§o 2026*
+
+## Variáveis de ambiente
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `DATABASE_URL` | Sim | `postgres://user:pass@host:5432/db` |
+| `POSTGRES_PASSWORD` | Sim (VPS) | Senha do container PostgreSQL |
+| `MP_ACCESS_TOKEN` | Sim | Token Mercado Pago |
+| `WEBHOOK_SECRET` | Não | Valida header `x-webhook-secret` |
+| `EVOLUTION_API_URL` | Sim | `http://evolution-api:8080` (interno Docker) |
+| `EVOLUTION_API_KEY` | Sim | Chave de autenticação da Evolution API |
+| `EVOLUTION_INSTANCE` | Sim | Nome da instância WhatsApp |
+| `ADMIN_WHATSAPP` | Sim | Número admin para alertas de erro |
+| `ADMIN_TOKEN` | Sim | Senha do painel admin (mín. 16 chars) |
+| `CRON_SECRET` | Sim | Autenticação dos endpoints cron (mín. 16 chars) |
+| `DOMAIN` | Sim (VPS) | Domínio principal (ex: `meusite.com`) |
+| `NEXT_PUBLIC_APP_URL` | Não | URL pública da aplicação |
+
+---
+
+## Schema do banco
+
+```sql
+-- v1 (001_init_schema.sql)
+app_user      (id, nome, tel, email)
+fatura        (id, id_user, situ[0=pendente/1=pago/2=cancelada], valor, forma, vencimento, data_pagamento, mp_payment_id)
+acesso        (id, id_user, dados TEXT, ativo)
+automation_log(id, id_user, id_fatura, mp_payment_id, status, erro, whatsapp_enviado, created_at)
+
+-- v2 (002_expand_schema.sql)
+plano         (id, nome, valor, dias_vigencia, ativo)
+job_queue     (id, tipo, payload JSONB, tentativas, max_tentativas, status, proximo_em, erro)
+-- + colunas: app_user.{plano_id, ativo, data_vencimento}, acesso.ativo
+```
+
+---
+
+## Rodar local
+
+```bash
+# 1. Configurar variáveis
+cp env.example .env.local
+nano .env.local
+
+# 2. PostgreSQL local via Docker
+docker run -d --name cz-db \
+  -e POSTGRES_DB=clientezero \
+  -e POSTGRES_USER=clientezero \
+  -e POSTGRES_PASSWORD=local123 \
+  -p 5432:5432 postgres:16-alpine
+
+# 3. Aplicar schemas
+docker exec -i cz-db psql -U clientezero clientezero < sql/supabase/001_init_schema.sql
+docker exec -i cz-db psql -U clientezero clientezero < sql/002_expand_schema.sql
+
+# 4. Instalar e rodar
+npm install && npm run dev
+```
+
+---
+
+## Deploy na VPS
+
+```bash
+# 1. Configurar arquivos de ambiente
+cp .env.vps.example .env.vps && nano .env.vps
+cp .env.n8n.example .env.n8n && nano .env.n8n
+
+# 2. Deploy (sobe PostgreSQL + Next.js + N8N + Evolution API + Caddy)
+chmod +x scripts/*.sh
+./scripts/vps-deploy.sh
+
+# 3. Aplicar schema v2 (primeira vez apenas)
+docker exec -i clientezero-db psql -U clientezero clientezero \
+  < sql/002_expand_schema.sql
+
+# 4. Validar
+./scripts/vps-smoke-test.sh https://seudominio.com
+```
+
+### Após o deploy
+
+1. **Parear WhatsApp**: Acesse `https://evolution.seudominio.com` → criar instância → escanear QR code
+2. **Configurar N8N** em `https://n8n.seudominio.com`:
+   - Schedule a cada 5min → `POST https://seudominio.com/api/cron/process-jobs`
+   - Schedule todo dia 00:00 → `POST https://seudominio.com/api/cron/gerar-faturas`
+   - Schedule todo dia 08:00 → `POST https://seudominio.com/api/cron/cobrar-inadimplentes`
+   - Todos com header `x-cron-secret: <CRON_SECRET>`
+3. **Registrar webhook no MP**: `https://seudominio.com/api/mp/webhook` com header `x-webhook-secret`
+4. **Acessar painel**: `https://seudominio.com/admin` com o `ADMIN_TOKEN`
+5. **Criar primeiro plano** em `/admin` → usar API `POST /api/admin/planos`
+6. **Cadastrar clientes** em `/admin/clientes/novo`
+
+---
+
+## Estrutura do projeto
+
+```
+app/
+  admin/
+    layout.tsx              # Nav lateral (Client Component)
+    login/page.tsx          # Login com ADMIN_TOKEN
+    dashboard/page.tsx      # Métricas e últimos logs
+    clientes/               # CRUD clientes
+    faturas/page.tsx        # Lista de faturas
+    logs/page.tsx           # Logs + botão Reenviar WA
+  api/
+    health/route.ts
+    mp/webhook/route.ts     # MP: aprovado + chargeback
+    admin/                  # CRUD API (clientes, faturas, planos, resend, auth)
+    cron/                   # process-jobs, gerar-faturas, cobrar-inadimplentes
+lib/
+  db.ts                     # Conexão PostgreSQL (pool)
+  env.ts                    # Validação de variáveis (Zod)
+  job-queue.ts              # Fila de retry
+  automation-log.ts
+  mercado-pago.ts
+  evolution.ts
+  sanitize.ts
+middleware.ts               # Proteção /admin/* via cookie
+sql/
+  supabase/001_init_schema.sql
+  002_expand_schema.sql     # v2: plano, job_queue, colunas novas
+  seed.sql
+scripts/
+  vps-deploy.sh
+  vps-smoke-test.sh
+  run-migrations.sh
+```
+
+---
+
+## Troubleshooting
+
+```bash
+# Logs dos containers
+docker compose logs -f clientezero-web
+docker compose logs -f evolution-api
+docker compose logs -f n8n
+
+# Testar banco
+docker exec -it clientezero-db psql -U clientezero clientezero
+
+# Ver jobs pendentes de retry
+docker exec -it clientezero-db psql -U clientezero clientezero \
+  -c "SELECT id, tipo, tentativas, status, proximo_em FROM job_queue WHERE status != 'done';"
+
+# Restart serviço
+docker compose restart clientezero-web
+
+# Checar Evolution API
+curl http://localhost:8080  # direto no servidor
+```
