@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Plano = { id: number; nome: string; valor: number; dias_vigencia: number };
+type Plano = { id: number; nome: string; valor: number; dias_vigencia: number; ativo: boolean };
 
 export default function NovoClientePage() {
   const router = useRouter();
