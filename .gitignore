@@ -1,7 +1,10 @@
 /.env
 .env.local
 .env.*.local
+.env.vps
+.env.n8n
 node_modules/
+.next/
 __pycache__/
 *.log
 .vscode/
