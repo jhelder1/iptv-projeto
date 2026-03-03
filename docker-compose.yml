@@ -48,8 +48,8 @@ services:
       - .env.n8n
     volumes:
       - n8n_data:/home/node/.n8n
-    expose:
-      - "5678"
+    ports:
+      - "5678:5678"
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,8 +60,10 @@ services:
     image: atendai/evolution-api:latest
     container_name: evolution-api
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      SERVER_URL: https://evolution.${DOMAIN}
+      SERVER_URL: http://${SERVER_IP}:8080
       DEL_INSTANCE: "false"
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
@@ -81,8 +83,8 @@ services:
       CONFIG_SESSION_PHONE_NAME: Chrome
     volumes:
       - evolution_data:/evolution/instances
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
