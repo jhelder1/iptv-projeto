@@ -8,10 +8,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const res = NextResponse.json({ ok: true });
+  const isHttps = process.env.NEXT_PUBLIC_APP_URL?.startsWith("https");
   res.cookies.set("admin_token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isHttps === true,
+    sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7, // 7 dias
     path: "/",
   });
