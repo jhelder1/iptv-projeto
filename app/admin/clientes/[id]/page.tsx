@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getDb } from "@/lib/db";
 import ClienteActions from "./actions";
+import ProdutosSection from "./ProdutosSection";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,8 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
           </pre>
         </div>
       )}
+
+      <ProdutosSection idUser={idNum} />
 
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>

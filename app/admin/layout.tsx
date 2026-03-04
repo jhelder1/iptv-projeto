@@ -19,6 +19,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Link href="/admin/dashboard" className={pathname === "/admin/dashboard" ? "active" : ""}>Dashboard</Link>
         <Link href="/admin/clientes" className={pathname.startsWith("/admin/clientes") ? "active" : ""}>Clientes</Link>
         <Link href="/admin/faturas" className={pathname.startsWith("/admin/faturas") ? "active" : ""}>Faturas</Link>
+        <Link href="/admin/planos" className={pathname.startsWith("/admin/planos") ? "active" : ""}>Planos</Link>
+        <Link href="/admin/servidores" className={pathname.startsWith("/admin/servidores") ? "active" : ""}>Servidores</Link>
+        <Link href="/admin/produtos" className={pathname.startsWith("/admin/produtos") ? "active" : ""}>Produtos</Link>
+        <Link href="/admin/conciliacao" className={pathname.startsWith("/admin/conciliacao") ? "active" : ""}>Conciliação</Link>
         <Link href="/admin/logs" className={pathname.startsWith("/admin/logs") ? "active" : ""}>Logs</Link>
         <div style={{ flex: 1 }} />
         <button

@@ -115,7 +115,7 @@ Acesse `https://seu-dominio.com/admin` e faça login com o `ADMIN_TOKEN`.
 | `ADMIN_WHATSAPP` | Sim | Número admin para alertas de erro |
 | `ADMIN_TOKEN` | Sim | Senha do painel admin (mín. 16 chars) |
 | `CRON_SECRET` | Sim | Autenticação dos endpoints cron (mín. 16 chars) |
-| `DOMAIN` | Sim (VPS) | Domínio principal (ex: `meusite.com`) |
+| `DOMAIN` | Não | Domínio principal (ex: `meusite.com`). Pode ficar em branco se usar só IP. |
 | `NEXT_PUBLIC_APP_URL` | Não | URL pública da aplicação |
 
 ---
@@ -165,31 +165,35 @@ npm install && npm run dev
 
 ```bash
 # 1. Configurar arquivos de ambiente
-cp .env.vps.example .env.vps && nano .env.vps
+cp .env.vps.example .env && nano .env
 cp .env.n8n.example .env.n8n && nano .env.n8n
 
 # 2. Deploy (sobe PostgreSQL + Next.js + N8N + Evolution API + Caddy)
 chmod +x scripts/*.sh
 ./scripts/vps-deploy.sh
 
-# 3. Aplicar schema v2 (primeira vez apenas)
+# 3. Aplicar schemas (primeira vez apenas)
+docker exec -i clientezero-db psql -U clientezero clientezero \
+  < sql/supabase/001_init_schema.sql
 docker exec -i clientezero-db psql -U clientezero clientezero \
   < sql/002_expand_schema.sql
 
 # 4. Validar
-./scripts/vps-smoke-test.sh https://seudominio.com
+./scripts/vps-smoke-test.sh http://SEU_IP
 ```
+
+> **Sem domínio (só IP)?** O Caddy serve o painel em `http://IP:80`. O N8N fica em `http://IP:5678` e a Evolution API em `http://IP:8080`.
 
 ### Após o deploy
 
-1. **Parear WhatsApp**: Acesse `https://evolution.seudominio.com` → criar instância → escanear QR code
-2. **Configurar N8N** em `https://n8n.seudominio.com`:
-   - Schedule a cada 5min → `POST https://seudominio.com/api/cron/process-jobs`
-   - Schedule todo dia 00:00 → `POST https://seudominio.com/api/cron/gerar-faturas`
-   - Schedule todo dia 08:00 → `POST https://seudominio.com/api/cron/cobrar-inadimplentes`
+1. **Parear WhatsApp**: Acesse `http://SEU_IP:8080` → criar instância → escanear QR code
+2. **Configurar N8N** em `http://SEU_IP:5678`:
+   - Schedule a cada 5min → `POST http://SEU_IP/api/cron/process-jobs`
+   - Schedule todo dia 00:00 → `POST http://SEU_IP/api/cron/gerar-faturas`
+   - Schedule todo dia 08:00 → `POST http://SEU_IP/api/cron/cobrar-inadimplentes`
    - Todos com header `x-cron-secret: <CRON_SECRET>`
-3. **Registrar webhook no MP**: `https://seudominio.com/api/mp/webhook` com header `x-webhook-secret`
-4. **Acessar painel**: `https://seudominio.com/admin` com o `ADMIN_TOKEN`
+3. **Registrar webhook no MP**: `http://SEU_IP/api/mp/webhook` com header `x-webhook-secret`
+4. **Acessar painel**: `http://SEU_IP/admin` com o `ADMIN_TOKEN`
 5. **Criar primeiro plano** em `/admin` → usar API `POST /api/admin/planos`
 6. **Cadastrar clientes** em `/admin/clientes/novo`
 
